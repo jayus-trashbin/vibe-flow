@@ -1,7 +1,9 @@
 import { getClientId } from './clientId'
 
 // CLIENT_ID is retrieved dynamically from storage or .env
-const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || window.location.origin + '/'
+// Force exact trailing slash behavior
+const baseUri = import.meta.env.VITE_REDIRECT_URI || window.location.origin
+const REDIRECT_URI = baseUri.endsWith('/') ? baseUri : baseUri + '/'
 const SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
@@ -47,8 +49,8 @@ export async function initiateLogin() {
   const challenge = await generateCodeChallenge(verifier)
   const state = generateRandomString(16)
 
-  sessionStorage.setItem('pkce_verifier', verifier)
-  sessionStorage.setItem('pkce_state', state)
+  localStorage.setItem('pkce_verifier', verifier)
+  localStorage.setItem('pkce_state', state)
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -69,8 +71,8 @@ export async function handleCallback(code, state) {
     throw new Error('Spotify Client ID not configured')
   }
 
-  const storedState = sessionStorage.getItem('pkce_state')
-  const verifier = sessionStorage.getItem('pkce_verifier')
+  const storedState = localStorage.getItem('pkce_state')
+  const verifier = localStorage.getItem('pkce_verifier')
 
   if (state !== storedState) {
     throw new Error('State mismatch — possible CSRF attack.')
@@ -96,8 +98,8 @@ export async function handleCallback(code, state) {
   const data = await response.json()
   const expiresAt = Date.now() + data.expires_in * 1000
 
-  sessionStorage.removeItem('pkce_verifier')
-  sessionStorage.removeItem('pkce_state')
+  localStorage.removeItem('pkce_verifier')
+  localStorage.removeItem('pkce_state')
 
   return {
     accessToken: data.access_token,
