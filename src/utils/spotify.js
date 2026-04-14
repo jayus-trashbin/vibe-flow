@@ -1,5 +1,13 @@
 const BASE = 'https://api.spotify.com/v1'
 
+// Custom error class to carry HTTP status
+class SpotifyError extends Error {
+  constructor(message, status) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function apiFetch(token, path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -12,7 +20,8 @@ async function apiFetch(token, path, options = {}) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error?.message || `Spotify API error ${res.status}`)
+    const msg = err.error?.message || `Spotify API error ${res.status}`
+    throw new SpotifyError(msg, res.status)
   }
 
   if (res.status === 204) return null
@@ -42,18 +51,22 @@ export async function getAllPlaylists(token, onProgress) {
   return playlists
 }
 
+// Fetch full playlist detail to get accurate track count
+export async function getPlaylistDetail(token, playlistId) {
+  return apiFetch(token, `/playlists/${playlistId}?fields=id,name,tracks(total),images`)
+}
+
 // --- Tracks ---
 
 export async function getPlaylistTracks(token, playlistId, onProgress) {
   const tracks = []
-  // Omit fields filter on page 1 to get full data; subsequent pages use Spotify's next URL
-  let url = `/playlists/${playlistId}/tracks?limit=100`
+  let url = `/playlists/${playlistId}/tracks?limit=100&market=from_token`
 
   while (url) {
     const data = await apiFetch(token, url)
     if (!data?.items) break
 
-    const valid = data.items.filter(item => item?.track?.id)
+    const valid = data.items.filter(item => item?.track?.id && item.track.type === 'track')
     tracks.push(...valid.map(item => item.track))
     onProgress?.(tracks.length, data.total ?? tracks.length)
 
@@ -64,6 +77,8 @@ export async function getPlaylistTracks(token, playlistId, onProgress) {
 }
 
 // --- Audio Features ---
+// NOTE: Spotify deprecated this endpoint for new apps (post Nov 2023).
+// Returns null if the app doesn't have Extended Access — caller should fall back.
 
 export async function getAudioFeatures(token, trackIds, onProgress) {
   const features = {}
@@ -71,7 +86,17 @@ export async function getAudioFeatures(token, trackIds, onProgress) {
 
   for (let i = 0; i < trackIds.length; i += chunkSize) {
     const chunk = trackIds.slice(i, i + chunkSize)
-    const data = await apiFetch(token, `/audio-features?ids=${chunk.join(',')}`)
+
+    let data
+    try {
+      data = await apiFetch(token, `/audio-features?ids=${chunk.join(',')}`)
+    } catch (err) {
+      if (err.status === 403) {
+        // Audio features deprecated for this app — signal caller to use fallback
+        return null
+      }
+      throw err
+    }
 
     const audioFeatures = data?.audio_features ?? []
     for (const f of audioFeatures) {
@@ -90,6 +115,25 @@ export async function getAudioFeatures(token, trackIds, onProgress) {
     onProgress?.(Math.min(i + chunkSize, trackIds.length), trackIds.length)
   }
 
+  return features
+}
+
+// Build synthetic features from track popularity when audio-features are unavailable
+export function buildFallbackFeatures(tracks) {
+  const features = {}
+  for (const t of tracks) {
+    const p = (t.popularity ?? 50) / 100
+    // Map popularity to a plausible feature space:
+    // high popularity ≈ more danceable/energetic; low ≈ more acoustic/mellow
+    features[t.id] = {
+      energy:           p,
+      valence:          p * 0.8 + 0.1,
+      danceability:     p * 0.9 + 0.05,
+      tempo:            p * 0.6 + 0.2,
+      acousticness:     1 - p * 0.7,
+      instrumentalness: Math.max(0, 0.3 - p * 0.3),
+    }
+  }
   return features
 }
 

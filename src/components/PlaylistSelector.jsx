@@ -3,7 +3,7 @@ import { StarSmall } from './Decorations'
 
 function PlaylistCard({ playlist, selected, onClick }) {
   const image = playlist.images?.[0]?.url
-  const trackCount = playlist.tracks?.total ?? 0
+  const trackCount = playlist.tracks?.total ?? playlist.tracks_total ?? '—'
 
   return (
     <button

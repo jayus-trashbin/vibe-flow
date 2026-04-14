@@ -5,7 +5,8 @@ import {
 } from './utils/auth'
 import { getClientId } from './utils/clientId'
 import {
-  getMe, getAllPlaylists, getPlaylistTracks, getAudioFeatures,
+  getMe, getAllPlaylists, getPlaylistDetail, getPlaylistTracks,
+  getAudioFeatures, buildFallbackFeatures,
   createPlaylist, addTracksToPlaylist,
 } from './utils/spotify'
 import {
@@ -57,6 +58,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [saveProgress, setSaveProgress] = useState(0)
   const [savedUrl, setSavedUrl] = useState(null)
+  const [usingFallback, setUsingFallback] = useState(false)
 
   // Error
   const [error, setError] = useState(null)
@@ -126,11 +128,24 @@ export default function App() {
     return () => { cancelled = true }
   }, [tokens, getToken])
 
-  // ---- Select playlist → go to weights ----
-  function handlePlaylistSelect(playlist) {
+  // ---- Select playlist → fetch full detail (accurate track count) → go to weights ----
+  async function handlePlaylistSelect(playlist) {
     setSelectedPlaylist(playlist)
     setSavedUrl(null)
     setStep('weights')
+    // Fetch accurate track total in background and update
+    try {
+      const tok = await getToken(tokens)
+      const detail = await getPlaylistDetail(tok, playlist.id)
+      if (detail?.tracks?.total != null) {
+        setSelectedPlaylist(prev => ({
+          ...prev,
+          tracks: { ...prev.tracks, total: detail.tracks.total },
+        }))
+      }
+    } catch {
+      // Non-critical — continue with whatever total we have
+    }
   }
 
   // ---- Weight change ----
@@ -154,15 +169,23 @@ export default function App() {
         setAnalyzeTotal(tot)
       })
 
-      // 2. Fetch audio features
+      // 2. Fetch audio features (may return null if Spotify has deprecated access)
       setAnalyzeStage('features')
       setAnalyzeCurrent(0)
       setAnalyzeTotal(raw.length)
       const ids = raw.map(t => t.id)
-      const featuresMap = await getAudioFeatures(tok, ids, (cur, tot) => {
+      let featuresMap = await getAudioFeatures(tok, ids, (cur, tot) => {
         setAnalyzeCurrent(cur)
         setAnalyzeTotal(tot)
       })
+
+      if (featuresMap === null) {
+        // Audio features not available for this app — fall back to popularity
+        setUsingFallback(true)
+        featuresMap = buildFallbackFeatures(raw)
+      } else {
+        setUsingFallback(false)
+      }
 
       // 3. Enrich + sort
       setAnalyzeStage('sorting')
@@ -306,6 +329,7 @@ export default function App() {
           sortedScore={sortedScore}
           playlist={selectedPlaylist}
           weights={weights}
+          usingFallback={usingFallback}
           onSave={handleSave}
           onBack={() => setStep('weights')}
           saving={saving}

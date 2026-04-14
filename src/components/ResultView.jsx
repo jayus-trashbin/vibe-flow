@@ -118,6 +118,7 @@ export default function ResultView({
   originalTracks, sortedTracks,
   originalScore, sortedScore,
   playlist, weights,
+  usingFallback,
   onSave, onBack,
   saving, saveProgress, savedPlaylistUrl,
 }) {
@@ -159,9 +160,38 @@ export default function ResultView({
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{playlist.name}</span>
         </div>
 
-        <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em', marginBottom: 20 }}>
+        <h2 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.01em', marginBottom: usingFallback ? 12 : 20 }}>
           Your optimized <span className="text-gradient">playlist</span>
         </h2>
+
+        {/* Fallback warning */}
+        {usingFallback && (
+          <div style={{
+            background: 'rgba(245,158,11,0.08)',
+            border: '1px solid rgba(245,158,11,0.25)',
+            borderRadius: 10, padding: '10px 14px', marginBottom: 20,
+            display: 'flex', gap: 10, alignItems: 'flex-start',
+          }}>
+            <div style={{ width: 3, flexShrink: 0, alignSelf: 'stretch', background: '#F59E0B', borderRadius: 2 }} />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#F59E0B', marginBottom: 2 }}>
+                Sorted by popularity
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
+                Your Spotify app doesn't have access to audio features (deprecated for new apps).
+                The sort used track popularity as a proxy.{' '}
+                <a
+                  href="https://developer.spotify.com/documentation/web-api/concepts/quota-modes"
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ color: '#F59E0B', textDecoration: 'underline' }}
+                >
+                  Apply for Extended Access
+                </a>
+                {' '}to unlock full audio analysis.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Score card ────────────────────────────── */}
         <div
