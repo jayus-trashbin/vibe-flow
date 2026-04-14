@@ -148,7 +148,7 @@ export default function App() {
       // 1. Load tracks
       setAnalyzeStage('tracks')
       setAnalyzeCurrent(0)
-      setAnalyzeTotal(selectedPlaylist.tracks.total)
+      setAnalyzeTotal(selectedPlaylist.tracks?.total ?? 0)
       const raw = await getPlaylistTracks(tok, selectedPlaylist.id, (cur, tot) => {
         setAnalyzeCurrent(cur)
         setAnalyzeTotal(tot)
@@ -223,16 +223,21 @@ export default function App() {
 
   // ---- Render ----
   return (
-    <div className="min-h-screen bg-spotify-black">
+    <div className="min-h-screen" style={{ background: '#0A0A0F' }}>
       {/* Persistent error banner */}
       {error && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-900 border border-red-700
-                        text-white text-sm rounded-lg px-4 py-3 shadow-xl max-w-sm w-full flex items-start gap-2">
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-400">
+        <div style={{
+          position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 50, background: '#450a0a', border: '1px solid #b91c1c',
+          color: '#fff', fontSize: 13, borderRadius: 10, padding: '12px 16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxWidth: 380, width: 'calc(100% - 32px)',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <svg viewBox="0 0 24 24" fill="#f87171" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 1 }}>
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
-          <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-white">×</button>
+          <span style={{ flex: 1 }}>{error}</span>
+          <button onClick={() => setError(null)} style={{ color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
         </div>
       )}
 
@@ -240,8 +245,16 @@ export default function App() {
       {tokens && step !== 'welcome' && (
         <button
           onClick={handleLogout}
-          className="fixed top-4 right-4 z-40 text-xs text-spotify-text hover:text-white
-                     transition-colors bg-spotify-card rounded-full px-3 py-1.5"
+          style={{
+            position: 'fixed', top: 16, right: 16, zIndex: 40,
+            fontSize: 12, color: 'rgba(255,255,255,0.4)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 50, padding: '6px 14px', cursor: 'pointer',
+            transition: 'color 150ms',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.4)'}
         >
           Logout
         </button>

@@ -5,50 +5,24 @@ import { saveClientId } from '../utils/clientId'
 export default function SetupScreen({ onComplete }) {
   const [clientId, setClientId] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault()
     setError('')
 
-    if (!clientId.trim()) {
-      setError('Please enter your Spotify Client ID')
+    const id = clientId.trim()
+    if (!id) {
+      setError('Please enter your Spotify Client ID.')
+      return
+    }
+    // Spotify Client IDs are 32-character hex strings
+    if (!/^[0-9a-f]{32}$/i.test(id)) {
+      setError('That doesn\'t look like a valid Client ID. It should be a 32-character string.')
       return
     }
 
-    setLoading(true)
-
-    // Quick validation: try to list playlists
-    try {
-      const response = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: clientId.trim(),
-          client_secret: 'dummy', // Will fail, but that's ok — we just validate format
-        }),
-      })
-
-      // If we get a response (even 401), the Client ID format is valid
-      if (response.status === 401 || response.status === 400) {
-        // Expected — secret is wrong, but ID format was recognized
-        saveClientId(clientId.trim())
-        onComplete()
-      } else if (response.ok) {
-        // Unexpected success, but it works
-        saveClientId(clientId.trim())
-        onComplete()
-      } else {
-        setError('Invalid Client ID. Please check and try again.')
-      }
-    } catch (e) {
-      // Network error — assume the ID might be valid
-      saveClientId(clientId.trim())
-      onComplete()
-    } finally {
-      setLoading(false)
-    }
+    saveClientId(id)
+    onComplete()
   }
 
   return (
@@ -123,7 +97,7 @@ export default function SetupScreen({ onComplete }) {
               onBlur={e => {
                 e.target.style.borderColor = error ? 'rgba(239,68,68,0.5)' : 'var(--border)'
               }}
-              disabled={loading}
+
             />
           </div>
 
@@ -138,10 +112,10 @@ export default function SetupScreen({ onComplete }) {
           <button
             type="submit"
             className="btn-primary w-full"
-            disabled={loading || !clientId.trim()}
+            disabled={!clientId.trim()}
             style={{ padding: '12px 20px', fontSize: 14 }}
           >
-            {loading ? 'Verifying…' : 'Continue to Spotify'}
+            Continue to Spotify
           </button>
         </form>
 

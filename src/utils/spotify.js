@@ -31,15 +31,12 @@ export async function getAllPlaylists(token, onProgress) {
 
   while (url) {
     const data = await apiFetch(token, url)
-    playlists.push(...data.items)
-    onProgress?.(playlists.length, data.total)
+    if (!data?.items) break
 
-    if (data.next) {
-      // Extract relative path from absolute next URL
-      url = data.next.replace(BASE, '')
-    } else {
-      url = null
-    }
+    playlists.push(...data.items.filter(Boolean))
+    onProgress?.(playlists.length, data.total ?? playlists.length)
+
+    url = data.next ? data.next.replace(BASE, '') : null
   }
 
   return playlists
@@ -49,13 +46,16 @@ export async function getAllPlaylists(token, onProgress) {
 
 export async function getPlaylistTracks(token, playlistId, onProgress) {
   const tracks = []
-  let url = `/playlists/${playlistId}/tracks?limit=100&fields=next,total,items(track(id,name,artists,album(images),duration_ms,preview_url))`
+  // Omit fields filter on page 1 to get full data; subsequent pages use Spotify's next URL
+  let url = `/playlists/${playlistId}/tracks?limit=100`
 
   while (url) {
     const data = await apiFetch(token, url)
-    const valid = data.items.filter(item => item.track && item.track.id)
+    if (!data?.items) break
+
+    const valid = data.items.filter(item => item?.track?.id)
     tracks.push(...valid.map(item => item.track))
-    onProgress?.(tracks.length, data.total)
+    onProgress?.(tracks.length, data.total ?? tracks.length)
 
     url = data.next ? data.next.replace(BASE, '') : null
   }
@@ -73,16 +73,16 @@ export async function getAudioFeatures(token, trackIds, onProgress) {
     const chunk = trackIds.slice(i, i + chunkSize)
     const data = await apiFetch(token, `/audio-features?ids=${chunk.join(',')}`)
 
-    for (const f of data.audio_features) {
-      if (f) {
+    const audioFeatures = data?.audio_features ?? []
+    for (const f of audioFeatures) {
+      if (f?.id) {
         features[f.id] = {
-          energy: f.energy,
-          valence: f.valence,
-          danceability: f.danceability,
-          // Normalize tempo from ~50-200 BPM to 0-1
-          tempo: Math.min(1, Math.max(0, (f.tempo - 50) / 150)),
-          acousticness: f.acousticness,
-          instrumentalness: f.instrumentalness,
+          energy:           f.energy           ?? 0.5,
+          valence:          f.valence           ?? 0.5,
+          danceability:     f.danceability      ?? 0.5,
+          tempo:            Math.min(1, Math.max(0, ((f.tempo ?? 120) - 50) / 150)),
+          acousticness:     f.acousticness      ?? 0.5,
+          instrumentalness: f.instrumentalness  ?? 0,
         }
       }
     }
@@ -98,11 +98,7 @@ export async function getAudioFeatures(token, trackIds, onProgress) {
 export async function createPlaylist(token, userId, name, description) {
   return apiFetch(token, `/users/${userId}/playlists`, {
     method: 'POST',
-    body: JSON.stringify({
-      name,
-      description,
-      public: false,
-    }),
+    body: JSON.stringify({ name, description, public: false }),
   })
 }
 
