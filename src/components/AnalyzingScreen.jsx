@@ -91,7 +91,7 @@ export default function AnalyzingScreen({ stage, current, total }) {
             const done = i < stageIndex
             const active = i === stageIndex
             return (
-              <div key={s} style={{ display: 'flex', flex: 'col', alignItems: 'center', gap: 6, opacity: done || active ? 1 : 0.3 }}>
+              <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, opacity: done || active ? 1 : 0.3 }}>
                 <div
                   style={{
                     width: 28, height: 28, borderRadius: '50%',

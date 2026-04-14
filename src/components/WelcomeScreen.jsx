@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { initiateLogin } from '../utils/auth'
 import { Starburst, StarSmall, Zigzag, Splash } from './Decorations'
 
@@ -9,6 +10,16 @@ const FEATURES = [
 ]
 
 export default function WelcomeScreen() {
+  const [error, setError] = useState('')
+
+  async function handleLoginClick() {
+    setError('')
+    try {
+      await initiateLogin()
+    } catch (e) {
+      setError(e.message || 'Failed to start login. Please check your Client ID configuration.')
+    }
+  }
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-5 py-12 relative overflow-hidden"
@@ -92,11 +103,18 @@ export default function WelcomeScreen() {
         ))}
       </div>
 
+      {/* ── Error banner ──────────────────────────── */}
+      {error && (
+        <div style={{ marginBottom: 20, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '12px 14px', maxWidth: 400 }} className="fade-in">
+          <div style={{ fontSize: 12, color: '#EF4444' }}>{error}</div>
+        </div>
+      )}
+
       {/* ── CTA ──────────────────────────────────────── */}
       <div className="fade-in relative z-10 flex flex-col items-center" style={{ animationDelay: '280ms' }}>
         <button
           className="btn-primary"
-          onClick={initiateLogin}
+          onClick={handleLoginClick}
           style={{ fontSize: 15, padding: '14px 40px' }}
         >
           Connect with Spotify

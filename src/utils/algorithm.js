@@ -118,9 +118,17 @@ export function calcVibeScore(tracks, weights = DEFAULT_WEIGHTS) {
  * Enrich tracks array by merging audio features into each track object.
  */
 export function enrichTracks(tracks, featuresMap) {
-  return tracks
+  const enriched = tracks
     .filter(t => featuresMap[t.id])
     .map(t => ({ ...t, features: featuresMap[t.id] }))
+
+  const dropped = tracks.length - enriched.length
+  if (dropped > 0) {
+    const pct = Math.round((dropped / tracks.length) * 100)
+    console.warn(`[Vibe Flow] Excluded ${dropped} tracks (${pct}%) without audio features`)
+  }
+
+  return enriched
 }
 
 /**

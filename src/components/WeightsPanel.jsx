@@ -77,7 +77,7 @@ export default function WeightsPanel({ weights, onChange, startMode, onStartMode
               {playlist.name}
             </span>
             <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginLeft: 'auto', flexShrink: 0 }}>
-              {playlist.tracks?.total} tracks
+              {playlist.tracks?.total ?? '—'} tracks
             </span>
           </div>
           <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.01em' }}>

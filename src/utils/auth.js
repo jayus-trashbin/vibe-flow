@@ -5,6 +5,7 @@ import { getClientId } from './clientId'
 const baseUri = import.meta.env.VITE_REDIRECT_URI || window.location.origin
 const REDIRECT_URI = baseUri.endsWith('/') ? baseUri : baseUri + '/'
 const SCOPES = [
+  'user-read-private',
   'playlist-read-private',
   'playlist-read-collaborative',
   'playlist-modify-private',
@@ -136,6 +137,7 @@ export async function refreshAccessToken(refreshToken) {
 
 export function saveTokens(tokens) {
   localStorage.setItem('vf_tokens', JSON.stringify(tokens))
+  markTokenScopes()
 }
 
 export function loadTokens() {
@@ -149,8 +151,19 @@ export function loadTokens() {
 
 export function clearTokens() {
   localStorage.removeItem('vf_tokens')
+  localStorage.removeItem('vf_token_scopes')
 }
 
 export function isTokenExpired(tokens) {
   return !tokens || Date.now() >= tokens.expiresAt - 60_000
+}
+
+export function isTokenScopesStale() {
+  const savedScopes = localStorage.getItem('vf_token_scopes')
+  if (!savedScopes) return true
+  return savedScopes !== SCOPES
+}
+
+export function markTokenScopes() {
+  localStorage.setItem('vf_token_scopes', SCOPES)
 }

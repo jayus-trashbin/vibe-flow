@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   handleCallback, loadTokens, saveTokens, clearTokens,
-  isTokenExpired, refreshAccessToken,
+  isTokenExpired, refreshAccessToken, isTokenScopesStale,
 } from './utils/auth'
 import { getClientId } from './utils/clientId'
 import {
@@ -63,6 +63,13 @@ export default function App() {
   // Error
   const [error, setError] = useState(null)
 
+  // ---- Auto-close error banner after 6s ----
+  useEffect(() => {
+    if (!error) return
+    const timer = setTimeout(() => setError(null), 6000)
+    return () => clearTimeout(timer)
+  }, [error])
+
   // ---- Helper: get a valid token ----
   const getToken = useCallback(async (tok) => {
     if (!isTokenExpired(tok)) return tok.accessToken
@@ -96,7 +103,15 @@ export default function App() {
     } else {
       // Try restoring session
       const stored = loadTokens()
-      if (stored) setTokens(stored)
+      if (stored) {
+        // Check if scopes are stale (new permissions were added)
+        if (isTokenScopesStale()) {
+          clearTokens()
+          setError('Your Spotify permissions were updated. Please log in again.')
+          return
+        }
+        setTokens(stored)
+      }
     }
   }, [])
 
@@ -226,7 +241,7 @@ export default function App() {
         setSaveProgress(Math.round((cur / tot) * 100))
       })
 
-      setSavedUrl(newPlaylist.external_urls?.spotify ?? '')
+      setSavedUrl(newPlaylist.external_urls?.spotify || 'saved')
     } catch (e) {
       setError(e.message)
     } finally {
@@ -236,12 +251,16 @@ export default function App() {
 
   // ---- Logout ----
   function handleLogout() {
+    if (!window.confirm('Are you sure you want to log out?')) {
+      return
+    }
     clearTokens()
     setTokens(null)
     setUser(null)
     setPlaylists([])
     setSelectedPlaylist(null)
     setStep('welcome')
+    setError(null)
   }
 
   // ---- Render ----

@@ -60,17 +60,24 @@ export async function getPlaylistDetail(token, playlistId) {
 
 export async function getPlaylistTracks(token, playlistId, onProgress) {
   const tracks = []
-  let url = `/playlists/${playlistId}/tracks?limit=100&market=from_token`
+  let url = `/playlists/${playlistId}/tracks?limit=100`
 
-  while (url) {
-    const data = await apiFetch(token, url)
-    if (!data?.items) break
+  try {
+    while (url) {
+      const data = await apiFetch(token, url)
+      if (!data?.items) break
 
-    const valid = data.items.filter(item => item?.track?.id && item.track.type === 'track')
-    tracks.push(...valid.map(item => item.track))
-    onProgress?.(tracks.length, data.total ?? tracks.length)
+      const valid = data.items.filter(item => item?.track?.id && item.track.type === 'track')
+      tracks.push(...valid.map(item => item.track))
+      onProgress?.(tracks.length, data.total ?? tracks.length)
 
-    url = data.next ? data.next.replace(BASE, '') : null
+      url = data.next ? data.next.replace(BASE, '') : null
+    }
+  } catch (err) {
+    if (err.status === 403) {
+      throw new Error('Unable to load playlist tracks. Please try again or select a different playlist.')
+    }
+    throw err
   }
 
   return tracks
