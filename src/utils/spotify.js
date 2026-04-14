@@ -75,7 +75,7 @@ export async function getPlaylistTracks(token, playlistId, onProgress) {
     }
   } catch (err) {
     if (err.status === 403) {
-      const e = new Error('Unable to load playlist tracks. This may be a permissions issue — try re-logging in.')
+      const e = new Error('Unable to load playlist tracks. You may not have access to this playlist, or Spotify permissions may need updating. Try a different playlist or re-login.')
       e.status = 403
       e.isScopeError = true
       throw e

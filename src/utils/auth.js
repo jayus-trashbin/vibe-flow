@@ -136,6 +136,7 @@ export async function refreshAccessToken(refreshToken) {
     accessToken: data.access_token,
     refreshToken: data.refresh_token || refreshToken,
     expiresAt: Date.now() + data.expires_in * 1000,
+    grantedScope: data.scope || '',
   }
 }
 
