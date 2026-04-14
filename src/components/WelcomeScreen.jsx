@@ -9,13 +9,13 @@ const FEATURES = [
   { label: '100% Client-Side',  color: '#06B6D4', desc: 'No server, no AI costs, no data stored' },
 ]
 
-export default function WelcomeScreen() {
+export default function WelcomeScreen({ forceConsent = false }) {
   const [error, setError] = useState('')
 
   async function handleLoginClick() {
     setError('')
     try {
-      await initiateLogin()
+      await initiateLogin(forceConsent)
     } catch (e) {
       setError(e.message || 'Failed to start login. Please check your Client ID configuration.')
     }

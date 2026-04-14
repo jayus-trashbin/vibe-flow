@@ -4,13 +4,15 @@ import { getClientId } from './clientId'
 // Force exact trailing slash behavior
 const baseUri = import.meta.env.VITE_REDIRECT_URI || window.location.origin
 const REDIRECT_URI = baseUri.endsWith('/') ? baseUri : baseUri + '/'
-const SCOPES = [
+
+export const REQUIRED_SCOPES = [
   'user-read-private',
   'playlist-read-private',
   'playlist-read-collaborative',
   'playlist-modify-private',
   'playlist-modify-public',
-].join(' ')
+]
+const SCOPES = REQUIRED_SCOPES.join(' ')
 
 // --- PKCE Helpers ---
 
@@ -40,7 +42,7 @@ async function generateCodeChallenge(verifier) {
 
 // --- Auth Flow ---
 
-export async function initiateLogin() {
+export async function initiateLogin(forceConsent = false) {
   const clientId = getClientId()
   if (!clientId) {
     throw new Error('Spotify Client ID not configured')
@@ -61,6 +63,7 @@ export async function initiateLogin() {
     state,
     code_challenge_method: 'S256',
     code_challenge: challenge,
+    ...(forceConsent ? { show_dialog: 'true' } : {}),
   })
 
   window.location.href = `https://accounts.spotify.com/authorize?${params}`
@@ -106,6 +109,7 @@ export async function handleCallback(code, state) {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt,
+    grantedScope: data.scope || '',
   }
 }
 
@@ -137,7 +141,9 @@ export async function refreshAccessToken(refreshToken) {
 
 export function saveTokens(tokens) {
   localStorage.setItem('vf_tokens', JSON.stringify(tokens))
-  markTokenScopes()
+  if (tokens.grantedScope) {
+    localStorage.setItem('vf_granted_scopes', tokens.grantedScope)
+  }
 }
 
 export function loadTokens() {
@@ -152,6 +158,7 @@ export function loadTokens() {
 export function clearTokens() {
   localStorage.removeItem('vf_tokens')
   localStorage.removeItem('vf_token_scopes')
+  localStorage.removeItem('vf_granted_scopes')
 }
 
 export function isTokenExpired(tokens) {
@@ -159,11 +166,7 @@ export function isTokenExpired(tokens) {
 }
 
 export function isTokenScopesStale() {
-  const savedScopes = localStorage.getItem('vf_token_scopes')
-  if (!savedScopes) return true
-  return savedScopes !== SCOPES
-}
-
-export function markTokenScopes() {
-  localStorage.setItem('vf_token_scopes', SCOPES)
+  const granted = localStorage.getItem('vf_granted_scopes') || localStorage.getItem('vf_token_scopes') || ''
+  const grantedSet = new Set(granted.split(' ').filter(Boolean))
+  return REQUIRED_SCOPES.some(s => !grantedSet.has(s))
 }

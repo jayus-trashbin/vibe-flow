@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   handleCallback, loadTokens, saveTokens, clearTokens,
-  isTokenExpired, refreshAccessToken, isTokenScopesStale,
+  isTokenExpired, refreshAccessToken, isTokenScopesStale, REQUIRED_SCOPES,
 } from './utils/auth'
 import { getClientId } from './utils/clientId'
 import {
@@ -30,6 +30,7 @@ export default function App() {
   // Auth
   const [tokens, setTokens] = useState(null)
   const [user, setUser] = useState(null)
+  const [needsForceRelogin, setNeedsForceRelogin] = useState(false)
 
   // Navigation
   const [step, setStep] = useState('welcome')
@@ -63,12 +64,12 @@ export default function App() {
   // Error
   const [error, setError] = useState(null)
 
-  // ---- Auto-close error banner after 6s ----
+  // ---- Auto-close error banner after 6s (suppressed when re-login is needed) ----
   useEffect(() => {
-    if (!error) return
+    if (!error || needsForceRelogin) return
     const timer = setTimeout(() => setError(null), 6000)
     return () => clearTimeout(timer)
-  }, [error])
+  }, [error, needsForceRelogin])
 
   // ---- Helper: get a valid token ----
   const getToken = useCallback(async (tok) => {
@@ -96,8 +97,18 @@ export default function App() {
       window.history.replaceState({}, '', '/')
       handleCallback(code, state)
         .then(tok => {
+          // Validate that Spotify actually granted all required scopes
+          const granted = new Set((tok.grantedScope || '').split(' ').filter(Boolean))
+          const missing = REQUIRED_SCOPES.filter(s => !granted.has(s))
+          if (missing.length > 0) {
+            clearTokens()
+            setNeedsForceRelogin(true)
+            setError(`Spotify did not grant all required permissions (missing: ${missing.join(', ')}). Please re-login.`)
+            return
+          }
           saveTokens(tok)
           setTokens(tok)
+          setNeedsForceRelogin(false)
         })
         .catch(e => setError(e.message))
     } else {
@@ -107,13 +118,27 @@ export default function App() {
         // Check if scopes are stale (new permissions were added)
         if (isTokenScopesStale()) {
           clearTokens()
-          setError('Your Spotify permissions were updated. Please log in again.')
+          setNeedsForceRelogin(true)
+          setError('Your Spotify permissions were updated. Please re-login.')
           return
         }
         setTokens(stored)
       }
     }
   }, [])
+
+  // ---- Mid-session stale scope guard ----
+  useEffect(() => {
+    if (!tokens) return
+    if (!isTokenScopesStale()) return
+    clearTokens()
+    setTokens(null)
+    setUser(null)
+    setPlaylists([])
+    setStep('welcome')
+    setNeedsForceRelogin(true)
+    setError('Your Spotify permissions were updated. Please re-login.')
+  }, [tokens])
 
   // ---- When tokens arrive, load user + playlists ----
   useEffect(() => {
@@ -218,7 +243,12 @@ export default function App() {
       setSortedScore(sScore)
       setStep('results')
     } catch (e) {
-      setError(e.message)
+      if (e.status === 403 && e.isScopeError) {
+        setNeedsForceRelogin(true)
+        setError('Permission denied by Spotify. Please re-login to fix this.')
+      } else {
+        setError(e.message)
+      }
       setStep('weights')
     }
   }
@@ -261,6 +291,19 @@ export default function App() {
     setSelectedPlaylist(null)
     setStep('welcome')
     setError(null)
+    setNeedsForceRelogin(false)
+  }
+
+  // ---- Re-login helper (for error banner button) ----
+  function handleRelogin() {
+    clearTokens()
+    setTokens(null)
+    setUser(null)
+    setPlaylists([])
+    setSelectedPlaylist(null)
+    setStep('welcome')
+    setError(null)
+    // Keep needsForceRelogin=true so WelcomeScreen passes forceConsent=true to initiateLogin
   }
 
   // ---- Render ----
@@ -272,14 +315,26 @@ export default function App() {
           position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
           zIndex: 50, background: '#450a0a', border: '1px solid #b91c1c',
           color: '#fff', fontSize: 13, borderRadius: 10, padding: '12px 16px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxWidth: 380, width: 'calc(100% - 32px)',
-          display: 'flex', alignItems: 'flex-start', gap: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', maxWidth: 420, width: 'calc(100% - 32px)',
+          display: 'flex', alignItems: 'center', gap: 10,
         }}>
-          <svg viewBox="0 0 24 24" fill="#f87171" style={{ width: 16, height: 16, flexShrink: 0, marginTop: 1 }}>
+          <svg viewBox="0 0 24 24" fill="#f87171" style={{ width: 16, height: 16, flexShrink: 0 }}>
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
           </svg>
           <span style={{ flex: 1 }}>{error}</span>
-          <button onClick={() => setError(null)} style={{ color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+          {needsForceRelogin && (
+            <button
+              onClick={handleRelogin}
+              style={{
+                background: '#b91c1c', color: '#fff', border: 'none',
+                borderRadius: 6, padding: '4px 10px', fontSize: 12,
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
+              Re-login
+            </button>
+          )}
+          <button onClick={() => setError(null)} style={{ color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, flexShrink: 0 }}>×</button>
         </div>
       )}
 
@@ -308,7 +363,7 @@ export default function App() {
       )}
 
       {clientIdConfigured && step === 'welcome' && (
-        <WelcomeScreen />
+        <WelcomeScreen forceConsent={needsForceRelogin} />
       )}
 
       {clientIdConfigured && step === 'playlists' && (
